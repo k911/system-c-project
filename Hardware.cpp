@@ -5,7 +5,7 @@
 #include "Hardware.h"
 
 void hardware::runSixth() {
-    if(readChannel->read() == 6) {
-        cout << (readChannel->running() ? "Program 6" : "Program 6 Off" ) << endl;
+    if(program->read() == 6) {
+        cout << (running->read() ? "Program 6" : "Program 6 Off") << endl;
     }
 }

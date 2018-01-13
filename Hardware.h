@@ -1,11 +1,11 @@
 #pragma once
 
 #include <systemc.h>
-#include "MyDataChannel.h"
 
 SC_MODULE(hardware) {
     sc_in_clk clock;
-    sc_port<MyReadInterface> readChannel;
+    sc_in<sc_int<4>> program;
+    sc_in<sc_int<4>> running;
 
     void runSixth();
 

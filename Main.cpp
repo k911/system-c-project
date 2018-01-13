@@ -1,5 +1,5 @@
 #include <systemc.h>
-#include "MyDataChannel.h"
+#include "MyFifo.h"
 #include "Hardware.h"
 
 using namespace std;
@@ -7,14 +7,19 @@ using namespace std;
 SC_MODULE(Procesor2) {
     sc_in_clk clock;
     sc_port<MyReadInterface> readChannel;
+    sc_signal<sc_int<4>> program;
+    sc_signal<sc_int<4>> running;
 
     hardware submodule;
 
-    SC_CTOR(Procesor2): submodule("submodule")  {
+    SC_CTOR(Procesor2) : submodule("submodule") {
+        program.write(0);
+        running.write(0);
         submodule.clock(clock);
-        submodule.readChannel(readChannel);
+        submodule.program(program);
+        submodule.running(running);
 
-        SC_METHOD(runSecondAndError)
+        SC_THREAD(runSecondAndError)
         sensitive << clock.pos();
 
         SC_METHOD(runThird)
@@ -28,38 +33,59 @@ SC_MODULE(Procesor2) {
     }
 
     void runSecondAndError() {
-        switch (readChannel->read()) {
-            case 0:
-            case 1:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-                break;
-            case 2:
-                cout << (readChannel->running() ? "Program 2" : "Program 2 Off" ) << endl;
-                break;
-            default:
-                cout << "Error" << endl;
-                break;
+        int val, programWrite, runningWrite;
+        while (true) {
+
+            val = readChannel->read();
+            if (running.read() == val) {
+                programWrite = val;
+                runningWrite = 0;
+            } else if (running.read() == 0 && val != -1) {
+                programWrite = val;
+                runningWrite = val;
+            } else {
+                programWrite = -1;
+                runningWrite = 0;
+            }
+
+            // Write state
+            program.write(programWrite);
+            running.write(runningWrite);
+
+            // Handle program 2 and error
+            switch (programWrite) {
+                case 0:
+                case 1:
+                case 3:
+                case 4:
+                case 5:
+                case 6:
+                    break;
+                case 2:
+                    cout << (runningWrite ? "Program 2" : "Program 2 Off") << endl;
+                    break;
+                default:
+                    cout << "Error" << endl;
+                    break;
+            }
         }
     }
 
     void runFifth() {
-        if(readChannel->read() == 5) {
-            cout << (readChannel->running() ? "Program 5" : "Program 5 Off" ) << endl;
+        if (program.read() == 5) {
+            cout << (running.read() ? "Program 5" : "Program 5 Off") << endl;
         }
     }
 
     void runFourth() {
-        if(readChannel->read() == 4) {
-            cout << (readChannel->running() ? "Program 4" : "Program 4 Off" ) << endl;
+        if (program.read() == 4) {
+            cout << (running.read() ? "Program 4" : "Program 4 Off") << endl;
         }
     }
 
     void runThird() {
-        if(readChannel->read() == 3) {
-            cout << (readChannel->running() ? "Program 3" : "Program 3 Off" ) << endl;
+        if (program.read() == 3) {
+            cout << (running.read() ? "Program 3" : "Program 3 Off") << endl;
         }
     }
 };
@@ -67,29 +93,47 @@ SC_MODULE(Procesor2) {
 SC_MODULE(Procesor1) {
     sc_in_clk clock;
     sc_port<MyWriteInterface> writeChannel;
-    sc_port<MyReadInterface> readChannel;
     sc_out<bool> terminate;
+    sc_signal<sc_int<4>> program;
 
     SC_CTOR(Procesor1) {
+        program.write(0);
+
         SC_THREAD(runReadWrite)
         sensitive << clock.pos();
 
-        SC_METHOD(runFirst)
+        SC_THREAD(runFirst)
         sensitive << clock.pos();
     }
 
     void runFirst() {
-        if(readChannel->read() == 1) {
-            cout << (readChannel->running() ? "Program 1" : "Program 1 Off" ) << endl;
+        long running = 0;
+        while (true) {
+            wait();
+            long val = program.read();
+
+            if (running == val) {
+                running = 0;
+            } else if (running == 0 && val != -1) {
+                running = val;
+            } else {
+                val = -1;
+                running = 0;
+            }
+
+
+            if (val == 1) {
+                cout << (running ? "Program 1" : "Program 1 Off") << endl;
+            }
         }
     }
 
     void runReadWrite() {
 
-        int program;
+        int val;
         string input;
 
-        while(true) {
+        while (true) {
             wait();
 
             getline(cin, input);
@@ -98,9 +142,11 @@ SC_MODULE(Procesor1) {
 
                 if (input == "quit") {
                     cout << "Terminating.." << endl;
+                    program.write(0);
                     writeChannel->write(0);
                     terminate->write(true);
                 } else {
+                    program.write(-1);
                     writeChannel->write(-1);
                 }
 
@@ -108,9 +154,12 @@ SC_MODULE(Procesor1) {
             }
 
             string::size_type st;
-            program = stoi(input, &st);
-
-            writeChannel->write(program);
+            val = stoi(input, &st);
+            if(val > 6) {
+                val = -1;
+            }
+            program.write(val);
+            writeChannel->write(val);
         }
     }
 
@@ -120,7 +169,7 @@ int sc_main(int argc, char *argv[]) {
     sc_signal<bool> terminate;
     sc_signal<bool> clock;
     sc_time sc_time1 = sc_time(1.0, sc_time_unit::SC_NS);
-    MyDataChannel dataChannel;
+    MyFifo dataChannel("fifo1");
 
     Procesor1 taskModule1("taskModule1");
     Procesor2 taskModule2("taskModule2");
@@ -128,8 +177,6 @@ int sc_main(int argc, char *argv[]) {
     taskModule1.clock(clock);
     taskModule1.terminate(terminate);
     taskModule1.writeChannel(dataChannel);
-    taskModule1.readChannel(dataChannel);
-
     taskModule2.clock(clock);
     taskModule2.readChannel(dataChannel);
 
