@@ -28,9 +28,7 @@ SC_MODULE(Procesor2) {
     }
 
     void runSecondAndError() {
-        int program = 0;
-        program = readChannel->read();
-        switch (program) {
+        switch (readChannel->read()) {
             case 0:
             case 1:
             case 3:
@@ -39,7 +37,7 @@ SC_MODULE(Procesor2) {
             case 6:
                 break;
             case 2:
-                cout << "Program 2" << endl;
+                cout << (readChannel->running() ? "Program 2" : "Program 2 Off" ) << endl;
                 break;
             default:
                 cout << "Error" << endl;
@@ -49,19 +47,19 @@ SC_MODULE(Procesor2) {
 
     void runFifth() {
         if(readChannel->read() == 5) {
-            cout << "Program 5" << endl;
+            cout << (readChannel->running() ? "Program 5" : "Program 5 Off" ) << endl;
         }
     }
 
     void runFourth() {
         if(readChannel->read() == 4) {
-            cout << "Program 4" << endl;
+            cout << (readChannel->running() ? "Program 4" : "Program 4 Off" ) << endl;
         }
     }
 
     void runThird() {
         if(readChannel->read() == 3) {
-            cout << "Program 3" << endl;
+            cout << (readChannel->running() ? "Program 3" : "Program 3 Off" ) << endl;
         }
     }
 };
@@ -82,7 +80,7 @@ SC_MODULE(Procesor1) {
 
     void runFirst() {
         if(readChannel->read() == 1) {
-            cout << "Program 1" << endl;
+            cout << (readChannel->running() ? "Program 1" : "Program 1 Off" ) << endl;
         }
     }
 
